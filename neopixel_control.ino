@@ -1,4 +1,5 @@
 #include <Adafruit_NeoPixel.h>
+#include <math.h>
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
@@ -13,12 +14,14 @@
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
 //   NEO_RGBW    Pixels are wired for RGBW bitstream (NeoPixel RGBW products)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(85, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(90, PIN, NEO_GRB + NEO_KHZ800);
 
 // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
 // and minimize distance between Arduino and first pixel.  Avoid connecting
 // on a live circuit...if you must, connect GND first.
+
+byte colorCube[90][3];
 
 void setup() {
   // This is for Trinket 5V 16MHz, you can remove these three lines if you are not using a Trinket
@@ -27,57 +30,80 @@ void setup() {
   #endif
   // End of trinket special code
 
+  double x;
+  double y;
+  double z;
+
+  byte red;
+  byte green;
+  byte blue;
+
+  for(uint8_t t = 0; t < 90; t++){
+    
+    //parameterization for x. were going to get 85 points, so we multiply t by 2pi/85 to cover the entire knot 
+    
+    x=.41*cos((t*2*M_PI)/90)-.18*sin((t*2*M_PI)/90)-.83*cos(2*(t*2*M_PI)/90)-.83*sin(2*(t*2*M_PI)/90)-.11*cos(3*(t*2*M_PI)/90)+.27*sin(3*(t*2*M_PI)/90);
+//    x=x*1000.0;
+//    x=x/1000.0;
+    x*=2;
+    x=x+3;//add 3 to shift right 3, make calues positive
+    
+    //repeating for y
+    y=.36*cos((t*2*M_PI)/90)+.27*sin((t*2*M_PI)/90)-1.13*cos(2*(t*2*M_PI)/90)+.30*sin(2*(t*2*M_PI)/90)+.11*cos(3*(t*2*M_PI)/90)-.27*sin(3*(t*2*M_PI)/90);
+//    y=y*1000;
+//    y=y/1000.0;
+    y*=2;
+    y=y+3;//forward 3
+    
+    //repeating for z
+    z=.45*sin((t*2*M_PI)/90)-.30*cos(2*(t*2*M_PI)/90)+1.13*sin(2*(t*2*M_PI)/90)-.11*cos(3*(t*2*M_PI)/90)+.27*sin(3*(t*2*M_PI)/90);
+//    z=z*1000;
+//    z=z/1000.0;
+    z*=2;
+    z=z+3;//up 3
+    
+    red=constrain(byte(floor(x*51)), 0, 255);
+    green=constrain(byte(floor(y*51)), 0, 255);
+    blue=constrain(byte(floor(z*51)), 0, 255);
+
+    byte colors[3] = {red, green, blue};
+    colorCube[t][0] = colors[0];
+    colorCube[t][1] = colors[1];
+    colorCube[t][2] = colors[2];
+  }
+
   Serial.begin(9600);
   strip.begin();
+
+  for(uint8_t i = 0; i < strip.numPixels(); i++){
+    strip.setPixelColor(i, strip.Color(colorCube[i][0], colorCube[i][1], colorCube[i][2]));  
+  }
+  
   strip.show(); // Initialize all pixels to 'off'
 }
 
 void loop() {
-  // Some example procedures showing how to display to the pixels:
 
-//  int r = 255;
-//  int g = 255;
-//  int b = 255;
-
-  if(Serial.available() == 3){
-    /*
-      Use Serial.read() to read in one byte at a time for red, green, and blue
-      Since 1 byte is all we need for each color
-
-      Maybe use char delimiters so we can be sure we're setting colors 
-      to their corresponding vals
-    */
-    byte colors[3];
-
-    int numBytes = Serial.readBytes(colors, 3);
-
-//    byte r = Serial.read();
-//    char g = Serial.read();
-//    byte b = byte(Serial.read());
-//    byte red = 0;
-//    byte green = 0;
-//    byte blue = b;
-
-    byte red = colors[0];
-    byte green = colors[1];
-    byte blue = colors[2];
-    
-    if(red >= 0 && blue >= 0 && green >= 0){
-      colorWipe(strip.Color(red, green, blue), 5);
-    }
-  }
-//  colorWipe(strip.Color(r, g, b), 5);
-//  colorWipe(strip.Color(255, 0, 0), 1); // Red
-//colorWipe(strip.Color(0, 0, 0, 255), 50); // White RGBW
-  // Send a theater pixel chase in...
-//  theaterChase(strip.Color(127, 127, 127), 50); // White
-//  theaterChase(strip.Color(127, 0, 0), 50); // Red
-//  theaterChase(strip.Color(0, 0, 127), 50); // Blue
+//  if(Serial.available() >= 3){
+//    
+//    //Use Serial.readBytes() to read in 3 RGB values at a time
+//    byte colors[3];
+//    int numBytes = Serial.readBytes(colors, 3);
 //
-//  rainbow(20);
-//  rainbowCycle(20);
-//  singlePixel(strip.Color(0, 0, 255), 20);
-//  theaterChaseRainbow(50);
+//    byte red = colors[0];
+//    byte green = colors[1];
+//    byte blue = colors[2];
+//    
+//    if(red >= 0 && blue >= 0 && green >= 0){
+//      colorChange(strip.Color(red, green, blue));
+//    }
+//  }
+
+  if(Serial.available()){
+    byte pos = Serial.read();
+    singlePosition(strip.Color(colorCube[pos][0], colorCube[pos][1], colorCube[pos][2]), pos);  
+  }
+  
 }
 
 // Fill the dots one after the other with a color
@@ -88,6 +114,16 @@ void colorWipe(uint32_t c, uint8_t wait) {
     delay(wait);
   }
 }
+
+
+// Fill the dots all at once
+void colorChange(uint32_t c) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+  }
+  strip.show();
+}
+
 
 // Send a single pixel around the strip
 void singlePixel(uint32_t c, uint8_t wait) {
@@ -100,6 +136,20 @@ void singlePixel(uint32_t c, uint8_t wait) {
     strip.setPixelColor(i, c);
     strip.show();
     delay(wait);
+  }
+}
+
+// Light up a single pixel at a specified position
+void singlePosition(uint32_t c, uint8_t pos) {
+  if(pos < strip.numPixels()){
+    for(uint16_t i = 0; i < strip.numPixels(); i++){
+      if(i == pos){
+        strip.setPixelColor(i, c);
+      }else{
+        strip.setPixelColor(i, 0);
+      }  
+    }
+    strip.show();  
   }
 }
 
